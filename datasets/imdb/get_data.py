@@ -6,7 +6,6 @@ import json
 from torch.utils.data import Dataset, DataLoader
 import h5py
 from gensim.models import KeyedVectors
-from .vgg import VGGClassifier
 from robustness.text_robust import add_text_noise
 from robustness.visual_robust import add_visual_noise
 import os
@@ -144,6 +143,7 @@ def get_dataloader(path: str, test_path: str, num_workers: int = 8, train_shuffl
     dataset = os.path.join(test_path, "dataset")
 
     if not skip_process:
+        from .vgg import VGGClassifier
         clsf = VGGClassifier(
             model_path='/home/pliang/multibench/MultiBench/datasets/imdb/vgg16.tar', synset_words='synset_words.txt')
         googleword2vec = KeyedVectors.load_word2vec_format(

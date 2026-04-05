@@ -195,7 +195,7 @@ def single_test(encoder, head, test_dataloader, auprc=False, modalnum=0, task='c
             accs = eval_affect(trueposneg, pred)
             acc2 = eval_affect(trueposneg, pred, exclude_zero=False)
             loss = (totalloss / totals).item() if criterion is not None else 0.0
-            corr = float(np.corrcoef(pred.astype(float), true.astype(float))[0][1]) if len(pred) > 1 else 0.0
+            corr = float(np.corrcoef(pred.astype(float).flatten(), true.astype(float).flatten())[0][1]) if len(pred) > 1 else 0.0
             print("acc: "+str(accs) + ', ' + str(acc2))
             return {'Accuracy': accs, 'Loss': loss, 'Corr': corr}
         else:
