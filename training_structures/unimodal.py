@@ -1,5 +1,6 @@
 """Implements training pipeline for unimodal comparison."""
 from sklearn.metrics import accuracy_score, f1_score
+import numpy as np
 import torch
 from torch import nn
 from utils.AUPRC import AUPRC
@@ -193,8 +194,10 @@ def single_test(encoder, head, test_dataloader, auprc=False, modalnum=0, task='c
             trueposneg = true
             accs = eval_affect(trueposneg, pred)
             acc2 = eval_affect(trueposneg, pred, exclude_zero=False)
+            loss = (totalloss / totals).item() if criterion is not None else 0.0
+            corr = float(np.corrcoef(pred.astype(float), true.astype(float))[0][1]) if len(pred) > 1 else 0.0
             print("acc: "+str(accs) + ', ' + str(acc2))
-            return {'Accuracy': accs}
+            return {'Accuracy': accs, 'Loss': loss, 'Corr': corr}
         else:
             return {'MSE': (totalloss / totals).item()}
 
@@ -215,11 +218,12 @@ def test(encoder, head, test_dataloaders_all, dataset='default', method_name='My
         no_robust (bool, optional): Whether to not apply robustness methods or not. Defaults to False.
     """
     if no_robust:
+        result = [None]
         def _testprocess():
-            single_test(encoder, head, test_dataloaders_all,
-                        auprc, modalnum, task, criterion)
+            result[0] = single_test(encoder, head, test_dataloaders_all,
+                                    auprc, modalnum, task, criterion)
         all_in_one_test(_testprocess, [encoder, head])
-        return
+        return result[0]
 
     def _testprocess():
         single_test(encoder, head, test_dataloaders_all[list(

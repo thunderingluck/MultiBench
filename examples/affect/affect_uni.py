@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # Load data
     # mosi_raw.pkl, mosei_raw.pkl, sarcasm.pkl, humor.pkl
     datafile = {'mosi': 'mosi_raw', 'mosei': 'mosei_senti_data'}
-    traindata, validdata, testdata = get_dataloader('./data/multibench/'+datafile[args.data]+'.pkl', num_workers=0, robust_test=False, data_type=args.data)
+    traindata, validdata, testdata = get_dataloader('./data/multibench/'+datafile[args.data]+'.pkl', num_workers=0, robust_test=False, data_type=args.data, max_pad=True, max_seq_len=50)
 
     log = np.zeros((args.n_runs, 3))
     for n in range(args.n_runs):
@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
         # mosi/mosei
         if args.enc == 'gru':
-            encoder = GRU(input_dim, hidden_dim1, dropout=True, has_padding=True).cuda()
+            encoder = GRU(input_dim, hidden_dim1, dropout=True, has_padding=False, last_only=True).cuda()
         else:
             encoder = Transformer(input_dim, hidden_dim1).cuda()
         output_dim = 2 if args.clf else 1
@@ -83,7 +83,7 @@ if __name__ == '__main__':
         if not args.eval_only:
             train(encoder, head, traindata, validdata, 100, task=task, optimtype=torch.optim.AdamW, lr=args.lr,
                   weight_decay=0.01, criterion=criterion, save_encoder=encoder_name, save_head=head_name,
-                  early_stop=True, modalnum=args.mod, is_packed=True)
+                  early_stop=True, modalnum=args.mod)
 
         # else:
         #     encoder_name = encoder_name.replace('reg', 'b1_reg')
@@ -94,11 +94,11 @@ if __name__ == '__main__':
         head = torch.load(head_name).cuda()
         print('Val data')
         tmp = test(encoder, head, validdata, 'affect', criterion=torch.nn.L1Loss(), task="posneg-classification",
-             modalnum=args.mod, no_robust=True, is_packed=True, measure_time=args.measure)
+             modalnum=args.mod, no_robust=True)
 
         print('Test data')
         tmp = test(encoder, head, testdata, 'affect', criterion=torch.nn.L1Loss(), task="posneg-classification",
-             modalnum=args.mod, no_robust=True, is_packed=True, measure_time=args.measure)
+             modalnum=args.mod, no_robust=True)
         log[n] = tmp['Accuracy'], tmp['Loss'], tmp['Corr']
 
     print(log)
