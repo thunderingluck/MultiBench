@@ -164,3 +164,4 @@ dmypy.json
 *.hdf5
 *.png
 .vector_cache/*
+log/
