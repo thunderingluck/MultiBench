@@ -11,7 +11,7 @@
 
 source activate multibench
 
-cd /orcd/home/002/evag/code/MultiBench
+cd /orcd/home/002/evag/code/MultiBench/final_project
 
 REGS=(0.001 0.01 0.1)
 

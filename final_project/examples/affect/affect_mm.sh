@@ -10,6 +10,6 @@
 
 source activate multibench
 
-cd /orcd/home/002/evag/code/MultiBench
+cd /orcd/home/002/evag/code/MultiBench/final_project
 
 python examples/affect/affect_mm.py --fusion 3 "$@"
