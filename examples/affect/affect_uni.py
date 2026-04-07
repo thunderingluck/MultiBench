@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # Load data
     # mosi_raw.pkl, mosei_raw.pkl, sarcasm.pkl, humor.pkl
     datafile = {'mosi': 'mosi_raw', 'mosei': 'mosei_senti_data'}
-    traindata, validdata, testdata = get_dataloader('./data/multibench/'+datafile[args.data]+'.pkl', num_workers=0, robust_test=False, data_type=args.data, max_pad=True, max_seq_len=50)
+    traindata, validdata, testdata = get_dataloader('./data/multibench/'+datafile[args.data]+'.pkl', num_workers=0, robust_test=False, data_type=args.data)
 
     log = np.zeros((args.n_runs, 3))
     for n in range(args.n_runs):
