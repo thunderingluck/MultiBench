@@ -1,5 +1,7 @@
 import os
 import argparse
+import json
+import time
 import numpy as np
 import torch
 import torch.nn as nn
@@ -310,3 +312,38 @@ if __name__ == '__main__':
 
     idx = np.argmax(log[:, 1])
     print('Best result', log[idx, :])
+
+    results_dir = os.path.join('./log', args.data, 'results')
+    os.makedirs(results_dir, exist_ok=True)
+    noise_tag = f'_np{args.text_noise_prob}_{args.text_noise_mode}' if args.text_noise_prob > 0 else ''
+    run_name = f'dyn_enc_{args.enc}_reg_{args.reg}_freeze{args.freeze}{noise_tag}_{time.strftime("%Y%m%d_%H%M%S")}'
+    results_path = os.path.join(results_dir, run_name + '.json')
+    summary = {
+        'args': vars(args),
+        'checkpoint': filename,
+        'per_run': {
+            'accuracy': log[:, 0].tolist(),
+            'loss': log[:, 1].tolist(),
+            'corr': log[:, 2].tolist(),
+            'flop': log[:, 3].tolist(),
+            'ratio': log[:, 4].tolist(),
+        },
+        'mean': {
+            'accuracy': float(np.mean(log[:, 0])),
+            'loss': float(np.mean(log[:, 1])),
+            'corr': float(np.mean(log[:, 2])),
+            'flop': float(np.mean(log[:, 3])),
+            'ratio': float(np.mean(log[:, 4])),
+        },
+        'std': {
+            'accuracy': float(np.std(log[:, 0])),
+            'loss': float(np.std(log[:, 1])),
+            'corr': float(np.std(log[:, 2])),
+            'flop': float(np.std(log[:, 3])),
+            'ratio': float(np.std(log[:, 4])),
+        },
+        'best_run': log[idx, :].tolist(),
+    }
+    with open(results_path, 'w') as f:
+        json.dump(summary, f, indent=2)
+    print(f'Saved results to {results_path}')
