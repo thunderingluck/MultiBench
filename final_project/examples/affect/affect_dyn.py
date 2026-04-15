@@ -175,6 +175,54 @@ class DynMMNetV2(nn.Module):
         return output
 
 
+class DynMMNetV2Noisy(DynMMNetV2):
+    """DynMMNetV2 with per-sample text-modality noise augmentation during training.
+
+    Motivation: if E1 (text-only) dominates E2 (multimodal) on clean data, the gate
+    collapses to always-E1. Corrupting text on a fraction of training samples creates
+    a "hard" slice where E2 must win, giving the gate something non-trivial to learn
+    and training robustness to text-channel noise directly.
+    """
+
+    def __init__(self, temp, hard_gate, freeze, model_name_list,
+                 text_noise_prob=0.0, text_noise_std=0.0, text_noise_mode='gaussian'):
+        super().__init__(temp, hard_gate, freeze, model_name_list)
+        self.text_noise_prob = text_noise_prob
+        self.text_noise_std = text_noise_std
+        self.text_noise_mode = text_noise_mode
+
+    def _corrupt_text(self, inputs):
+        if not self.training or self.text_noise_prob <= 0.0:
+            return inputs
+        text = inputs[0][2]
+        B = text.shape[0]
+        mask = (torch.rand(B, device=text.device) < self.text_noise_prob)
+        if not mask.any():
+            return inputs
+        view = (-1,) + (1,) * (text.dim() - 1)
+        m = mask.view(*view).to(text.dtype)
+        if self.text_noise_mode == 'zero':
+            new_text = text * (1.0 - m)
+        elif self.text_noise_mode == 'shuffle':
+            perm = torch.randperm(B, device=text.device)
+            new_text = text * (1.0 - m) + text[perm] * m
+        else:
+            std = self.text_noise_std if self.text_noise_std > 0 else text.detach().std()
+            noise = torch.randn_like(text) * std
+            new_text = text + noise * m
+        new_mods = list(inputs[0])
+        new_mods[2] = new_text
+        return (new_mods, inputs[1])
+
+    def forward(self, inputs):
+        inputs = self._corrupt_text(inputs)
+        return super().forward(inputs)
+
+    def forward_separate_branch(self, inputs, path, weight_enable):
+        inputs = self._corrupt_text(inputs)
+        return super().forward_separate_branch(inputs, path, weight_enable)
+
+
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("unimodal network on mosi",
                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -191,6 +239,13 @@ if __name__ == '__main__':
     argparser.add_argument("--infer-mode", type=int, default=0, help="inference mode")
     argparser.add_argument("--eval-only", action='store_true', help='no training')
     argparser.add_argument("--freeze", action='store_true', help='freeze other parts of the model')
+    argparser.add_argument("--text-noise-prob", type=float, default=0.0,
+                           help="per-sample prob of corrupting text modality during training")
+    argparser.add_argument("--text-noise-std", type=float, default=0.0,
+                           help="stdev for gaussian text noise; if 0, uses batch stdev")
+    argparser.add_argument("--text-noise-mode", type=str, default='gaussian',
+                           choices=['gaussian', 'zero', 'shuffle'],
+                           help="how to corrupt text: additive gaussian, zero-out, or shuffle across batch")
     args = argparser.parse_args()
 
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
@@ -209,9 +264,16 @@ if __name__ == '__main__':
         #     model_name_list.append(os.path.join('./log', args.data, 'reg_' + args.enc + '_encoder_' + m + '.pt'))
         # model = DynMMNet(3, args.temp, args.hard_gate, args.freeze, model_name_list).cuda()
         model_name_list = ['./log/mosei/b1_reg_transformer_encoder_text.pt', './log/mosei/b2_lf_tran.pt']
-        model = DynMMNetV2(args.temp, args.hard_gate, args.freeze, model_name_list).cuda()
+        if args.text_noise_prob > 0.0:
+            model = DynMMNetV2Noisy(args.temp, args.hard_gate, args.freeze, model_name_list,
+                                    text_noise_prob=args.text_noise_prob,
+                                    text_noise_std=args.text_noise_std,
+                                    text_noise_mode=args.text_noise_mode).cuda()
+        else:
+            model = DynMMNetV2(args.temp, args.hard_gate, args.freeze, model_name_list).cuda()
+        noise_tag = f'_np{args.text_noise_prob}_{args.text_noise_mode}' if args.text_noise_prob > 0 else ''
         filename = os.path.join('./log', args.data, 'dyn_enc_' + args.enc + '_reg_' + str(args.reg) +
-                                'freeze' + str(args.freeze) + '.pt')
+                                'freeze' + str(args.freeze) + noise_tag + '.pt')
 
         # Train
         if not args.eval_only:
