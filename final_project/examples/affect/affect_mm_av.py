@@ -41,6 +41,12 @@ class AVOnlyMMDL(MMDL):
             sliced = inputs[:2]
         return super().forward(sliced)
 
+    def reset_weight(self):
+        pass
+
+    def weight_stat(self):
+        pass
+
 
 def parse_args():
     p = argparse.ArgumentParser("audio+vision LF transformer on MOSEI")
