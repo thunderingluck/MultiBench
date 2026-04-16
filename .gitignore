@@ -165,3 +165,10 @@ dmypy.json
 *.png
 .vector_cache/*
 log/
+!final_project/log/
+!final_project/log/mosei/
+final_project/log/mosei/*
+!final_project/log/mosei/results/
+final_project/log/mosei/results/*
+!final_project/log/mosei/results/results.md
+!final_project/log/mosei/results/summary.md
