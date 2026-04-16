@@ -1,0 +1,47 @@
+unimodal training, modality text, task regression
+Epoch 0 train loss: tensor(0.7561, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 0 valid loss: tensor(0.6325, device='cuda:0')
+Saving Best
+Epoch 1 train loss: tensor(0.6806, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 1 valid loss: tensor(0.6198, device='cuda:0')
+Saving Best
+Epoch 2 train loss: tensor(0.6440, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 2 valid loss: tensor(0.6505, device='cuda:0')
+Epoch 3 train loss: tensor(0.6298, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 3 valid loss: tensor(0.6021, device='cuda:0')
+Saving Best
+Epoch 4 train loss: tensor(0.6161, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 4 valid loss: tensor(0.6038, device='cuda:0')
+Epoch 5 train loss: tensor(0.6065, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 5 valid loss: tensor(0.6128, device='cuda:0')
+Epoch 6 train loss: tensor(0.6005, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 6 valid loss: tensor(0.6033, device='cuda:0')
+Epoch 7 train loss: tensor(0.5883, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 7 valid loss: tensor(0.6136, device='cuda:0')
+Epoch 8 train loss: tensor(0.5788, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 8 valid loss: tensor(0.6070, device='cuda:0')
+Epoch 9 train loss: tensor(0.5712, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 9 valid loss: tensor(0.6223, device='cuda:0')
+Epoch 10 train loss: tensor(0.5641, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 10 valid loss: tensor(0.6227, device='cuda:0')
+Epoch 11 train loss: tensor(0.5485, device='cuda:0', grad_fn=<DivBackward0>)
+Epoch 11 valid loss: tensor(0.6168, device='cuda:0')
+Training Time: 59.39296293258667
+Training Peak Mem: 4929.09765625
+Training Params: 2805049
+Testing model ./log/mosei/reg_transformer_encoder_text.pt | ./log/mosei/reg_transformer_head_text.pt:
+Val data
+loss: tensor(0.6008, device='cuda:0')
+acc: 0.7973537604456824, 0.6864633493846977
+Inference Time: 0.3322303295135498
+Inference Params: 2805049
+Test data
+loss: tensor(0.6277, device='cuda:0')
+acc: 0.8033149171270718, 0.7008399741546414
+Inference Time: 0.7935745716094971
+Inference Params: 2805049
+[[0.80331492 0.62770659 0.51555654]]
+Finish 1 runs
+Test Accuracy 80.33 ± 0.00
+Loss 0.6277 ± 0.00
+Corr 0.5156 ± 0.00

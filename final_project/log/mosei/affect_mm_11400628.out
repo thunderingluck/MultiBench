@@ -1,0 +1,33 @@
+Fusion model lf_tran
+Epoch 0 | train loss 0.752 | valid loss 0.680
+Saving Best
+Epoch 1 | train loss 0.669 | valid loss 0.644
+Saving Best
+Epoch 2 | train loss 0.632 | valid loss 0.611
+Saving Best
+Epoch 3 | train loss 0.618 | valid loss 0.620
+Epoch 4 | train loss 0.603 | valid loss 0.596
+Saving Best
+Epoch 5 | train loss 0.593 | valid loss 0.593
+Saving Best
+Epoch 6 | train loss 0.581 | valid loss 0.599
+Epoch 7 | train loss 0.569 | valid loss 0.621
+Epoch 8 | train loss 0.559 | valid loss 0.601
+Epoch 9 | train loss 0.553 | valid loss 0.594
+Epoch 10 | train loss 0.542 | valid loss 0.610
+Epoch 11 | train loss 0.527 | valid loss 0.606
+Epoch 12 | train loss 0.517 | valid loss 0.639
+Epoch 13 | train loss 0.509 | valid loss 0.600
+Training Time: 139.87566471099854
+Training Peak Mem: 5273.6328125
+Training Params: 6921857
+Testing model ./log/mosei/lf_tran.pt:
+Val data
+Loss: 0.5928 | Accuracy 79.03 | Corr 0.481
+Test data
+Loss: 0.6059 | Accuracy 79.56 | Corr 0.507
+[[0.79560629 0.60589308 0.50676905]]
+Finish 1 runs
+Test Accuracy 79.56 ± 0.00
+Loss 0.6059 ± 0.0000
+Corr 0.5068 ± 0.0000

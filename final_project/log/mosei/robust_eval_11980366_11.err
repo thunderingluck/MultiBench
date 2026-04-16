@@ -1,0 +1,11 @@
+usage: unimodal network on mosi [-h] [--gpu GPU] [--data DATA]
+                                [--n-runs N_RUNS] [--enc ENC]
+                                [--n-epochs N_EPOCHS] [--temp TEMP]
+                                [--hard-gate] [--reg REG] [--lr LR] [--wd WD]
+                                [--infer-mode INFER_MODE] [--eval-only]
+                                [--freeze] [--text-noise-prob TEXT_NOISE_PROB]
+                                [--text-noise-std TEXT_NOISE_STD]
+                                [--text-noise-mode {gaussian,zero,shuffle}]
+                                [--eval-noise-sigmas EVAL_NOISE_SIGMAS]
+                                [--eval-noise-modalities EVAL_NOISE_MODALITIES]
+unimodal network on mosi: error: argument --infer-mode: expected one argument

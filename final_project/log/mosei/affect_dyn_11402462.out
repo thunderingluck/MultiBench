@@ -1,0 +1,151 @@
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 0 | train loss 0.601 | valid loss 0.602
+Saving Best
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 1 | train loss 0.597 | valid loss 0.602
+Saving Best
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 2 | train loss 0.596 | valid loss 0.601
+Saving Best
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 3 | train loss 0.595 | valid loss 0.603
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 4 | train loss 0.594 | valid loss 0.600
+Saving Best
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 5 | train loss 0.593 | valid loss 0.602
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 6 | train loss 0.592 | valid loss 0.605
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 7 | train loss 0.592 | valid loss 0.604
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 8 | train loss 0.592 | valid loss 0.602
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 9 | train loss 0.590 | valid loss 0.602
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 10 | train loss 0.590 | valid loss 0.605
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 11 | train loss 0.589 | valid loss 0.603
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+Epoch 12 | train loss 0.589 | valid loss 0.605
+Training Time: 227.36211705207825
+Training Peak Mem: 5661.4921875
+Training Params: 9948508
+Testing model ./log/mosei/dyn_enc_transformer_reg_0.1freezeFalse.pt:
+------------------------------Val data------------------------------
+Loss: 19.1701 | Accuracy 78.17 | Corr 0.469
+------------------------------Test data------------------------------
+Loss: 19.7295 | Accuracy 78.89 | Corr 0.507
+Total Flops 135.13M
+tensor([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        ...,
+        [1., 0.],
+        [1., 0.],
+        [1., 0.]])
+mean branch weight 1.0000, 0.0000
+[0.78892957]
+[19.72953224]
+[0.50697849]
+[135.13226318]
+[0.]
+------------------------------------------------------------
+Finish 1 runs
+Test Accuracy 78.89 ± 0.00
+Loss 19.7295 ± 0.0000
+Corr 0.5070 ± 0.0000
+FLOP 135.13 ± 0.00
+Ratio 0.000 ± 0.00
+Best result [  0.78892957  19.72953224   0.50697849 135.13226318   0.        ]
