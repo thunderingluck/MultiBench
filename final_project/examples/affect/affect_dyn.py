@@ -195,37 +195,42 @@ class DynMMNetV2Noisy(DynMMNetV2):
         # eval-time override: when >0, applies corruption at inference regardless of training mode
         self.eval_noise_std = 0.0
         self.eval_noise_prob = 1.0
+        self.eval_noise_modality = 2  # 0=vision, 1=audio, 2=text (MOSEI convention)
 
-    def _corrupt_text(self, inputs):
-        # training-time augmentation
-        if self.training and self.text_noise_prob > 0.0:
-            prob = self.text_noise_prob
-            std_override = getattr(self, 'text_noise_std', 0.0)
-        # eval-time injection (for robustness testing)
-        elif (not self.training) and getattr(self, 'eval_noise_std', 0.0) > 0.0:
-            prob = self.eval_noise_prob
-            std_override = self.eval_noise_std
-        else:
-            return inputs
-        text = inputs[0][2]
-        B = text.shape[0]
-        mask = (torch.rand(B, device=text.device) < prob)
+    # modality indices: 0=vision, 1=audio, 2=text
+    def _corrupt_modality(self, inputs, mod_idx, prob, std_override, mode):
+        x = inputs[0][mod_idx]
+        B = x.shape[0]
+        mask = (torch.rand(B, device=x.device) < prob)
         if not mask.any():
             return inputs
-        view = (-1,) + (1,) * (text.dim() - 1)
-        m = mask.view(*view).to(text.dtype)
-        if self.text_noise_mode == 'zero':
-            new_text = text * (1.0 - m)
-        elif self.text_noise_mode == 'shuffle':
-            perm = torch.randperm(B, device=text.device)
-            new_text = text * (1.0 - m) + text[perm] * m
-        else:
-            std = std_override if std_override > 0 else text.detach().std()
-            noise = torch.randn_like(text) * std
-            new_text = text + noise * m
+        view = (-1,) + (1,) * (x.dim() - 1)
+        m = mask.view(*view).to(x.dtype)
+        if mode == 'zero':
+            new_x = x * (1.0 - m)
+        elif mode == 'shuffle':
+            perm = torch.randperm(B, device=x.device)
+            new_x = x * (1.0 - m) + x[perm] * m
+        else:  # gaussian
+            std = std_override if std_override > 0 else x.detach().std()
+            noise = torch.randn_like(x) * std
+            new_x = x + noise * m
         new_mods = list(inputs[0])
-        new_mods[2] = new_text
+        new_mods[mod_idx] = new_x
         return (new_mods, inputs[1])
+
+    def _corrupt_text(self, inputs):
+        # training-time augmentation: always hits text (training objective is text-noise robustness)
+        if self.training and self.text_noise_prob > 0.0:
+            return self._corrupt_modality(inputs, 2, self.text_noise_prob,
+                                          getattr(self, 'text_noise_std', 0.0),
+                                          self.text_noise_mode)
+        # eval-time injection: configurable modality
+        if (not self.training) and getattr(self, 'eval_noise_std', 0.0) > 0.0:
+            mod_idx = getattr(self, 'eval_noise_modality', 2)
+            return self._corrupt_modality(inputs, mod_idx, self.eval_noise_prob,
+                                          self.eval_noise_std, self.text_noise_mode)
+        return inputs
 
     def forward(self, inputs):
         inputs = self._corrupt_text(inputs)
@@ -260,7 +265,9 @@ if __name__ == '__main__':
                            choices=['gaussian', 'zero', 'shuffle'],
                            help="how to corrupt text: additive gaussian, zero-out, or shuffle across batch")
     argparser.add_argument("--eval-noise-sigmas", type=str, default='',
-                           help="comma-separated sigmas for eval-time text corruption, e.g. '0.3,0.5,1.0'")
+                           help="comma-separated sigmas for eval-time corruption, e.g. '0.3,0.5,1.0'")
+    argparser.add_argument("--eval-noise-modalities", type=str, default='text',
+                           help="comma-separated list of modalities to corrupt at eval: 'vision,audio,text'")
     args = argparser.parse_args()
 
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu)
@@ -318,23 +325,33 @@ if __name__ == '__main__':
                    criterion=torch.nn.L1Loss(reduction='sum'), task='posneg-classification', no_robust=True, additional_loss=True)
         log[n] = tmp['Accuracy'], tmp['Loss'], tmp['Corr'], model.cal_flop(), model.weight_stat()
 
-        # Robustness sweep: inject text noise at eval time
+        # Robustness sweep: inject per-modality noise at eval time
         if args.eval_noise_sigmas and isinstance(model, DynMMNetV2Noisy):
             sigmas = [float(s) for s in args.eval_noise_sigmas.split(',') if s.strip()]
+            mod_name_to_idx = {'vision': 0, 'audio': 1, 'text': 2}
+            mods = [m.strip() for m in args.eval_noise_modalities.split(',') if m.strip()]
             robust_log = {}
-            for sigma in sigmas:
-                model.eval_noise_std = sigma
-                model.eval_noise_prob = 1.0  # corrupt every test sample
-                model.reset_weight()
-                print('-' * 20 + f' Test data (text sigma={sigma}) ' + '-' * 20)
-                tmp = test(model=model, test_dataloaders_all=testdata, dataset=args.data, is_packed=True,
-                           criterion=torch.nn.L1Loss(reduction='sum'), task='posneg-classification',
-                           no_robust=True, additional_loss=True)
-                flop = model.cal_flop()
-                ratio = model.weight_stat()
-                robust_log[sigma] = {'Accuracy': tmp['Accuracy'], 'Loss': tmp['Loss'],
-                                      'Corr': tmp['Corr'], 'FLOP': flop, 'E2_ratio': ratio}
+            for mod_name in mods:
+                if mod_name not in mod_name_to_idx:
+                    print(f'Skipping unknown modality {mod_name}')
+                    continue
+                mod_idx = mod_name_to_idx[mod_name]
+                robust_log[mod_name] = {}
+                for sigma in sigmas:
+                    model.eval_noise_std = sigma
+                    model.eval_noise_prob = 1.0
+                    model.eval_noise_modality = mod_idx
+                    model.reset_weight()
+                    print('-' * 20 + f' Test ({mod_name} sigma={sigma}) ' + '-' * 20)
+                    tmp = test(model=model, test_dataloaders_all=testdata, dataset=args.data, is_packed=True,
+                               criterion=torch.nn.L1Loss(reduction='sum'), task='posneg-classification',
+                               no_robust=True, additional_loss=True)
+                    flop = model.cal_flop()
+                    ratio = model.weight_stat()
+                    robust_log[mod_name][sigma] = {'Accuracy': tmp['Accuracy'], 'Loss': tmp['Loss'],
+                                                    'Corr': tmp['Corr'], 'FLOP': flop, 'E2_ratio': ratio}
             model.eval_noise_std = 0.0  # restore
+            model.eval_noise_modality = 2
             print('-' * 30 + 'Robustness Summary' + '-' * 30)
             print(json.dumps(robust_log, indent=2))
             robust_log_all.append(robust_log)
