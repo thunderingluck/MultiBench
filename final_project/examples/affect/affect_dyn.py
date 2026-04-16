@@ -358,7 +358,9 @@ if __name__ == '__main__':
     results_dir = os.path.join('./log', args.data, 'results')
     os.makedirs(results_dir, exist_ok=True)
     noise_tag = f'_np{args.text_noise_prob}_{args.text_noise_mode}' if args.text_noise_prob > 0 else ''
-    run_name = f'dyn_enc_{args.enc}_reg_{args.reg}_freeze{args.freeze}{noise_tag}_{time.strftime("%Y%m%d_%H%M%S")}'
+    mode_tag = {0: 'adapt', 1: 'E1', 2: 'E2', -1: 'uniform'}.get(args.infer_mode, f'mode{args.infer_mode}')
+    run_name = (f'dyn_enc_{args.enc}_reg_{args.reg}_freeze{args.freeze}{noise_tag}'
+                f'_{mode_tag}_{time.strftime("%Y%m%d_%H%M%S")}')
     results_path = os.path.join(results_dir, run_name + '.json')
     summary = {
         'args': vars(args),
