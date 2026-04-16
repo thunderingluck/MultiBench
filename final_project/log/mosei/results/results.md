@@ -14,13 +14,19 @@ Sweep: regularization weight (`reg`) × training text-noise probability (`noise_
 
 ## Table 1: Clean Test Performance (no training noise)
 
+Single run per cell. No test-time noise applied.
+
 | reg   | Accuracy | Corr   | FLOP (M) | E2 ratio |
 |-------|----------|--------|----------|----------|
-| 0.001 | 0.7838   | 0.5011 | —        | —        |
+| 0.001 | **0.7838** | **0.5011** | 293.6 | 0.857 |
 | 0.01  | 0.7775   | 0.4921 | 218.4    | 0.451    |
-| 0.1   | 0.7764   | 0.4944 | —        | —        |
+| 0.1   | 0.7764   | 0.4944 | **135.1** | 0.000 |
 
-> No robustness evaluation was run for clean-training models.
+**Observations from the clean sweep alone:**
+- The `reg` knob controls routing as designed: `reg=0.001` routes 86% of samples to the multimodal branch (E2), `reg=0.01` splits ~45/55, `reg=0.1` collapses to 0% E2 — i.e., always picks the text-only branch (E1). At `reg=0.1` the "dynamic" gate has degenerated into a static policy.
+- **Accuracy barely moves across the full reg range.** Best (`reg=0.001`, mostly-E2) to worst (`reg=0.1`, pure-E1): 0.7838 vs. 0.7764 — a 0.7 accuracy-point gap despite a 2.2× FLOP difference. Correlation gap is similarly small (0.501 vs. 0.494).
+- **Implication.** On clean MOSEI, the multimodal branch buys very little over text-only. Most of the gain lives in text — the other modalities add <1 accuracy point. This is the first hint that MOSEI is text-dominated; Finding 5 in [summary.md](summary.md) confirms it directly.
+- No robustness evaluation was run for these clean-training checkpoints; robustness numbers elsewhere in this doc come from the noise-augmented checkpoints.
 
 ---
 
