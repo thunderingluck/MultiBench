@@ -4,7 +4,7 @@ Companion to [results.md](results.md) (tables). This document narrates the findi
 
 ## TL;DR
 
-We trained the two-branch DynMMNetV2 gate with per-sample text-channel Gaussian noise (probabilities 0.25 / 0.5 / 0.75) across three FLOP-regularization weights (0.001 / 0.01 / 0.1), then evaluated each trained model under test-time Gaussian corruption — first on text alone, then per-modality (vision / audio / text) with the gate forced into each branch. Finally, we trained a text-free (audio + vision only) baseline to establish the ceiling for a hypothetical rescue branch. The adaptive gate **never beats the static multimodal expert (E2) on any cell**, clean or noisy. The reason is structural and now also informational: (a) both existing experts consume text, so no routing choice escapes text corruption, and (b) the text-free baseline reaches only **0.07 correlation** on clean data — the same level as a text-corrupted multimodal model — so even extending the architecture with a text-free branch cannot rescue this task on MOSEI. The negative result is dataset-level.
+We trained the two-branch DynMMNetV2 gate with per-sample text-channel Gaussian noise (probabilities 0.25 / 0.5 / 0.75) across three FLOP-regularization weights (0.001 / 0.01 / 0.1), then evaluated each trained model under test-time Gaussian corruption — first on text alone, then per-modality (vision / audio / text) with the gate forced into each branch. We also trained a text-free (audio + vision only) baseline to establish the ceiling for a hypothetical rescue branch, and back-filled robustness evals for the clean-trained (np=0.0) checkpoints to enable a direct noise-vs-clean head-to-head. The adaptive gate **never beats the static multimodal expert (E2) on binary accuracy in any cell**, clean or noisy. The reason is structural and informational: (a) both existing experts consume text, so no routing choice escapes text corruption, and (b) the text-free baseline reaches only **0.07 correlation** on clean data — the same level as a text-corrupted multimodal model — so even extending the architecture with a text-free branch cannot rescue this task on MOSEI. One nuance (Finding 6): noise-augmented training *does* consistently improve **regression correlation** under test-time noise (by up to +0.13), but this uplift doesn't move the binary sign boundary, so the headline accuracy metric doesn't reflect it. The negative result is dataset-level and metric-level — the training is doing real work in a direction the benchmark doesn't reward.
 
 ## Experiments
 
@@ -19,6 +19,10 @@ Eval-only sweep on the `reg=0.01` checkpoints, crossing `noise_prob ∈ {0.25, 0
 ### 3. Text-free viability check — [`affect_mm_av.sh`](../../../examples/affect/affect_mm_av.sh)
 
 Single training run of a late-fusion transformer using only vision + audio, with the text modality dropped entirely. Architecture mirrors E2's non-text encoders: `Transformer(35, 60)` vision + `Transformer(74, 120)` audio → `Concat` → `MLP(180, 128, 1)`, trained from scratch with L1 regression. Purpose: measure the upper bound on performance achievable without text — i.e., the ceiling for any hypothetical text-free expert that a three-branch DynMM could route to under text corruption. Results in [`lf_tran_av_20260416_184437.json`](lf_tran_av_20260416_184437.json).
+
+### 4. Clean-trained robustness backfill — [`affect_dyn_clean_eval.py`](../../../examples/affect/affect_dyn_clean_eval.py)
+
+Eval-only sweep that fills a gap in the original sweep: the three np=0.0 checkpoints (`reg ∈ {0.001, 0.01, 0.1}`) were trained without noise and therefore never evaluated under test-time noise. Approach: class-swap each loaded `DynMMNetV2` into `DynMMNetV2Noisy` (no parameter change — the subclass only adds a pre-forward text-corruption step) and run the standard σ ∈ {0.3, 0.5, 1.0} text-noise eval. This enables a direct head-to-head between clean-trained and noise-trained DynMMs on noisy data (Finding 6). Results in [`dyn_enc_transformer_reg_*_freezeFalse_cleaneval_*.json`](./).
 
 ## Findings
 
@@ -62,7 +66,7 @@ The E2-routing ratio *does* shift under corruption — it rises with σ, correct
 | Audio                   | 0.435       | 0.468 | 0.487 | 0.538 |
 | Text                    | 0.435       | 0.514 | 0.534 | 0.556 |
 
-So the gate *is* learning something — noise-augmented training is successfully activating the routing signal, which was the stated motivation in the [`DynMMNetV2Noisy`](../../../examples/affect/affect_dyn.py#L180-L186) docstring. But the redirection never closes the accuracy gap to a model that just always used E2. The dynamic decision costs accuracy and delivers no robustness benefit.
+So the gate *is* learning something — noise-augmented training is successfully activating the routing signal, which was the stated motivation in the [`DynMMNetV2Noisy`](../../../examples/affect/affect_dyn.py#L180-L186) docstring. But the redirection never closes the accuracy gap to a model that just always used E2. The dynamic decision costs accuracy on the headline binary-sentiment metric. (See Finding 6: on the regression correlation metric, the noise-trained gate *does* deliver a consistent improvement over the clean-trained gate — the dynamic behavior helps, but in a direction the binary metric doesn't see.)
 
 ### Finding 3 — Robustness was free, not earned
 
@@ -90,6 +94,30 @@ Place this alongside the text-corrupted multimodal results from Finding 1/4:
 | **A+V text-free, clean**          | **0.6950** | **0.073** |
 
 **A+V clean performs at the same level as a multimodal model whose text channel has been destroyed.** Vision + audio together contain almost no independent sentiment signal on MOSEI — just enough to push binary accuracy a few points above the ~53% majority-class baseline, but not enough to correlate meaningfully with the continuous sentiment target. This is a dataset-level ceiling, not a model-level one.
+
+### Finding 6 — Noise training helps correlation consistently but not accuracy
+
+The backfill eval (Experiment 4) makes the head-to-head possible. Comparing noise-trained (np=0.5, averaged over 3 seeds) against clean-trained (np=0.0, single run) on the same reg value, evaluated under the same text-noise sigmas:
+
+**Accuracy (Δ = noise-trained − clean-trained):** mixed, small, often negative.
+
+| reg   | σ=0.3    | σ=0.5    | σ=1.0    |
+|-------|----------|----------|----------|
+| 0.001 | +0.0052  | −0.0029  | **−0.0337** |
+| 0.01  | −0.0058  | −0.0054  | −0.0056  |
+| 0.1   | +0.0104  | +0.0118  | −0.0182  |
+
+**Correlation (Δ = noise-trained − clean-trained):** positive everywhere, up to +0.13.
+
+| reg   | σ=0.3    | σ=0.5    | σ=1.0    |
+|-------|----------|----------|----------|
+| 0.001 | **+0.1146** | **+0.1144** | +0.0685 |
+| 0.01  | +0.0161  | +0.0136  | +0.0335  |
+| 0.1   | +0.1051  | **+0.1321** | +0.0663 |
+
+**Interpretation.** Noise-augmented training is doing real work — every cell of the correlation delta is positive, by a non-trivial margin (+0.01 to +0.13). But this uplift does not translate into binary accuracy: the sign of the regression decision boundary barely moves, even though the model's predicted magnitudes align better with the true sentiment scores. The clean-trained `reg=0.001` checkpoint actually *beats* the noise-trained one in accuracy at σ=1.0 (0.710 vs 0.676) — a consequence of the clean-trained gate routing more uniformly under corruption (its E2-ratio drifts from 0.86 clean → 0.57 at σ=1.0) while the noise-trained gate stays committed to E2 (0.86 → 0.73). More-uniform routing happens to average in enough signal to edge out the noise-trained model on binary sign.
+
+This refines Finding 2: the gate's response to noise *does* improve the model's regression fidelity, but because the MOSEI task is typically evaluated through binary sign (pos/neg), the improvement is invisible to the headline metric. The noise-training value is real but is in a direction the benchmark doesn't reward.
 
 ## Why the results are negative
 
