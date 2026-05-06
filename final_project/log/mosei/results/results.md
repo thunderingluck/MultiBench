@@ -244,3 +244,60 @@ Standard MOSEI metric suite: Acc-2 (binary sign), Acc-5 (±2 bucket), Acc-7 (±3
 | Corr   | 9 / 9 |
 
 Noise training consistently improves regression quality (Corr, MAE) and fine-grained classification (Acc-5, Acc-7 positive in 8/9 cells). Binary accuracy (Acc-2) cannot reliably detect the improvement — it crosses the right direction only 4 times in 9. The standard MOSEI Pearson correlation (this table) is the most sensitive indicator of the effect.
+
+## Table 9: Confidence-Aware Gating Variants (reg=0.01)
+
+Architectural intervention: extend the gate's classifier head to receive per-modality L2 norms as additional inputs. Full description and motivation in Finding 7 of [summary.md](summary.md). Six configurations compared at reg=0.01: the two existing baselines plus four new variants — confidence gate ± `BatchNorm1d` normalization × {np=0.0, np=0.5}.
+
+### Accuracy (raw values)
+
+| # | Configuration                                | Clean   | σ=0.3   | σ=0.5   | σ=1.0   |
+|---|----------------------------------------------|---------|---------|---------|---------|
+| 1 | Baseline DynMMNetV2 (np=0.0, content gate)   | 0.7775  | 0.7362  | 0.7202  | 0.7051  |
+| 2 | Baseline DynMMNetV2Noisy (np=0.5)            | 0.7652  | 0.7303  | 0.7148  | 0.6995  |
+| 3 | Confident raw (np=0.0)                       | **0.7870** | 0.7364  | 0.7196  | 0.7071  |
+| 4 | Confident raw (np=0.5, collapsed→E2)         | 0.7833  | **0.7530** | **0.7321** | 0.6888  |
+| 5 | Confident-norm (np=0.0)                      | 0.7816  | 0.7312  | 0.7151  | 0.7069  |
+| 6 | Confident-norm (np=0.5, dynamic routing)     | 0.7459  | 0.7398  | 0.7179  | 0.7019  |
+
+### Correlation (phi coefficient)
+
+| # | Configuration                                | Clean   | σ=0.3   | σ=0.5   | σ=1.0   | avg σ |
+|---|----------------------------------------------|---------|---------|---------|---------|-------|
+| 1 | Baseline (np=0.0)                            | 0.4921  | 0.2475  | 0.1616  | 0.0415  | 0.150 |
+| 2 | Baseline (np=0.5)                            | 0.4814  | 0.2636  | 0.1752  | 0.0749  | 0.171 |
+| 3 | Confident raw (np=0.0)                       | 0.5028  | 0.2464  | 0.1533  | 0.0567  | 0.152 |
+| 4 | **Confident raw (np=0.5, collapsed→E2)**     | 0.4923  | **0.3923** | **0.3122** | **0.1581** | **0.287** |
+| 5 | Confident-norm (np=0.0)                      | 0.4987  | 0.2199  | 0.1154  | 0.0262  | 0.121 |
+| 6 | Confident-norm (np=0.5, dynamic routing)     | 0.4614  | 0.2952  | 0.1737  | 0.0788  | 0.169 |
+
+### E2-routing ratio (key behavioral signature)
+
+| # | Configuration                                | Clean   | σ=0.3   | σ=0.5   | σ=1.0   | Pattern                 |
+|---|----------------------------------------------|---------|---------|---------|---------|-------------------------|
+| 1 | Baseline (np=0.0)                            | 0.451   | 0.484   | 0.510   | 0.533   | weakly toward E2        |
+| 2 | Baseline (np=0.5)                            | 0.435   | 0.509   | 0.551   | 0.561   | toward E2               |
+| 3 | Confident raw (np=0.0)                       | 0.998   | 1.000   | 1.000   | 1.000   | **collapsed to E2**     |
+| 4 | Confident raw (np=0.5)                       | 0.998   | 0.997   | 0.996   | 0.990   | **collapsed to E2**     |
+| 5 | Confident-norm (np=0.0)                      | 0.470   | 0.014   | 0.000   | 0.000   | **wrong direction (collapses to E1!)** |
+| 6 | Confident-norm (np=0.5, dynamic)             | 0.287   | 0.801   | 0.985   | 1.000   | **textbook right direction** |
+
+### Δ from baseline (config #1): accuracy in percentage points, correlation as raw delta
+
+| # | Configuration                       | Δ Acc clean | Δ Acc σ=1.0 | Δ Acc avg σ | Δ Corr σ=1.0 | Δ Corr avg σ |
+|---|-------------------------------------|-------------|-------------|-------------|--------------|--------------|
+| 2 | Baseline noise-trained              | −1.23       | −0.56       | −0.56       | +0.0334      | +0.0211      |
+| 3 | Confident raw (np=0.0)              | **+0.95**   | +0.20       | +0.05       | +0.0152      | +0.0017      |
+| 4 | Confident raw (np=0.5, collapsed)   | +0.58       | −1.63       | **+0.41**   | **+0.1166**  | **+0.1370**  |
+| 5 | Confident-norm (np=0.0)             | +0.41       | +0.18       | −0.28       | −0.0153      | −0.0289      |
+| 6 | Confident-norm (np=0.5, dynamic)    | **−3.16**   | −0.32       | −0.06       | +0.0373      | +0.0188      |
+
+**Three structural observations:**
+
+1. **Without normalization, the gate collapses (configs 3, 4).** Per-modality norms span an order of magnitude (audio ≈ 85, vision ≈ 8, text ≈ 3); the linear classifier learns to ignore them and defaults to "always E2." Inspection of `gate_classifier.weight` confirms confidence weights are non-zero but overwhelmed by content + bias terms.
+
+2. **Normalization without noise training learns the wrong direction (config 5).** BatchNorm1d makes confidence inputs comparable in scale, but clean training never sees the high text-norm regime that noise injection produces. The linear weights extrapolate arbitrarily on out-of-distribution noisy inputs — and happen to push toward E1 (wrong direction). E2 ratio drops from 0.470 clean to 0.000 at σ=1.0. The falsifiable prediction (architecture alone fixes routing) is **falsified**.
+
+3. **Normalization + noise training achieves textbook routing (config 6).** E2 ratio shifts from 0.287 (clean) to 1.000 (σ=1.0) — exactly the dynamic-routing behavior the architecture was designed to produce.
+
+**The performance puzzle:** the *winning* configuration on correlation is config 4 (collapsed to E2), not config 6 (correctly routing). Why? On MOSEI there is no rescue branch — routing to E1 under text noise is lateral at best. The collapsed-to-E2 config 4 funneled 100% of noisy training samples through E2, training E2 itself to be more noise-robust. The correctly-routing config 6 split training between branches, leaving E2 less specialized. **Dynamic routing is worse than degenerate always-E2 routing on this dataset.** This is direct experimental confirmation of Finding 5: the bottleneck is not the routing mechanism but the absence of a useful destination.

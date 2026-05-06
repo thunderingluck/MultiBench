@@ -4,7 +4,7 @@ Companion to [results.md](results.md) (tables). This document narrates the findi
 
 ## TL;DR
 
-We trained the two-branch DynMMNetV2 gate with per-sample text-channel Gaussian noise (probabilities 0.25 / 0.5 / 0.75) across three FLOP-regularization weights (0.001 / 0.01 / 0.1), then evaluated each trained model under test-time Gaussian corruption — first on text alone, then per-modality (vision / audio / text) with the gate forced into each branch. We also trained a text-free (audio + vision only) baseline to establish the ceiling for a hypothetical rescue branch, and back-filled robustness evals for the clean-trained (np=0.0) checkpoints to enable a direct noise-vs-clean head-to-head. The adaptive gate **never beats the static multimodal expert (E2) on binary accuracy in any cell**, clean or noisy. The reason is structural and informational: (a) both existing experts consume text, so no routing choice escapes text corruption, and (b) the text-free baseline reaches only **0.07 correlation** on clean data — the same level as a text-corrupted multimodal model — so even extending the architecture with a text-free branch cannot rescue this task on MOSEI. One nuance (Finding 6): noise-augmented training *does* consistently improve **regression correlation** under test-time noise (by up to +0.13), but this uplift doesn't move the binary sign boundary, so the headline accuracy metric doesn't reflect it. The negative result is dataset-level and metric-level — the training is doing real work in a direction the benchmark doesn't reward.
+We trained the two-branch DynMMNetV2 gate with per-sample text-channel Gaussian noise (probabilities 0.25 / 0.5 / 0.75) across three FLOP-regularization weights (0.001 / 0.01 / 0.1), then evaluated each trained model under test-time Gaussian corruption — first on text alone, then per-modality (vision / audio / text) with the gate forced into each branch. We also trained a text-free (audio + vision only) baseline to establish the ceiling for a hypothetical rescue branch, back-filled robustness evals for the clean-trained (np=0.0) checkpoints to enable a direct noise-vs-clean head-to-head, and built an architectural extension (`DynMMNetV2Confident`) that feeds the gate per-modality reliability signals at inference time. The adaptive gate **never beats the static multimodal expert (E2) on binary accuracy in any cell**, clean or noisy. The reason is structural and informational: (a) both existing experts consume text, so no routing choice escapes text corruption, and (b) the text-free baseline reaches only **0.07 correlation** on clean data — the same level as a text-corrupted multimodal model — so even extending the architecture with a text-free branch cannot rescue this task on MOSEI. One nuance (Finding 6): noise-augmented training *does* consistently improve **regression correlation** under test-time noise (by up to +0.13), but this uplift doesn't move the binary sign boundary, so the headline accuracy metric doesn't reflect it. The architectural extension (Finding 7) demonstrates that confidence-aware gating can recover textbook dynamic routing under noise (E2 ratio 0.29 clean → 1.00 at σ=1.0), but the *highest correlation gain on MOSEI comes from a degenerate "always-E2" collapse that funnels all noisy training through E2*, not from dynamic routing — further confirming the diagnosis that on MOSEI the bottleneck is the dataset, not the routing mechanism. The negative result is dataset-level and metric-level — the training is doing real work in a direction the benchmark doesn't reward.
 
 ## Experiments
 
@@ -23,6 +23,10 @@ Single training run of a late-fusion transformer using only vision + audio, with
 ### 4. Clean-trained robustness backfill — [`affect_dyn_clean_eval.py`](../../../examples/affect/affect_dyn_clean_eval.py)
 
 Eval-only sweep that fills a gap in the original sweep: the three np=0.0 checkpoints (`reg ∈ {0.001, 0.01, 0.1}`) were trained without noise and therefore never evaluated under test-time noise. Approach: class-swap each loaded `DynMMNetV2` into `DynMMNetV2Noisy` (no parameter change — the subclass only adds a pre-forward text-corruption step) and run the standard σ ∈ {0.3, 0.5, 1.0} text-noise eval. This enables a direct head-to-head between clean-trained and noise-trained DynMMs on noisy data (Finding 6). Results in [`dyn_enc_transformer_reg_*_freezeFalse_cleaneval_*.json`](./).
+
+### 5. Confidence-aware gate — [`affect_dyn_confident.py`](../../../examples/affect/affect_dyn_confident.py)
+
+An architectural intervention that gives the gate explicit per-modality reliability information at inference time. `DynMMNetV2Confident` extends `DynMMNetV2Noisy` by feeding three additional inputs to the gate's classifier head: the mean L2 norm of each modality's features. Under Gaussian noise, the corrupted modality's norm increases — a direct corruption signal the gate can learn to use without needing noise-augmented training. The `--normalize-confidence` flag adds a `BatchNorm1d` over the three confidence inputs to address per-modality scale mismatch (audio norms ≈ 85 dwarf text norms ≈ 3). Trained at `reg=0.01` for `np ∈ {0.0, 0.5}` × `{raw, normalized}` = four configurations. See Finding 7.
 
 ## Findings
 
@@ -118,6 +122,56 @@ The backfill eval (Experiment 4) makes the head-to-head possible. Comparing nois
 **Interpretation.** Noise-augmented training is doing real work — every cell of the correlation delta is positive, by a non-trivial margin (+0.01 to +0.13). But this uplift does not translate into binary accuracy: the sign of the regression decision boundary barely moves, even though the model's predicted magnitudes align better with the true sentiment scores. The clean-trained `reg=0.001` checkpoint actually *beats* the noise-trained one in accuracy at σ=1.0 (0.710 vs 0.676) — a consequence of the clean-trained gate routing more uniformly under corruption (its E2-ratio drifts from 0.86 clean → 0.57 at σ=1.0) while the noise-trained gate stays committed to E2 (0.86 → 0.73). More-uniform routing happens to average in enough signal to edge out the noise-trained model on binary sign.
 
 This refines Finding 2: the gate's response to noise *does* improve the model's regression fidelity, but because the MOSEI task is typically evaluated through binary sign (pos/neg), the improvement is invisible to the headline metric. The noise-training value is real but is in a direction the benchmark doesn't reward.
+
+### Finding 7 — Confidence-aware gating works architecturally but not on MOSEI
+
+A natural architectural extension to address the wrong-direction-routing failure observed in Finding 4 is to give the gate explicit information about per-modality reliability at inference time, rather than relying on it to learn this from training-time noise alone. We extend `DynMMNetV2Noisy` to `DynMMNetV2Confident`, whose gate's classifier head receives three additional inputs: the mean L2 norm of each modality's features. Under Gaussian noise added to a bounded signal, the corrupted modality's norm increases — a direct, parameter-free corruption signal. The hypothesis was that a clean-trained confidence-aware gate would route correctly under test-time noise without needing noise augmentation.
+
+We trained four configurations at `reg=0.01`: confidence gate (no normalization) at `np ∈ {0.0, 0.5}`, and confidence gate with per-modality `BatchNorm1d` normalization on the confidence inputs at `np ∈ {0.0, 0.5}`. Comparison against the baseline DynMMNetV2 (`np=0.0`) and noise-trained DynMMNetV2Noisy (`np=0.5`):
+
+**Accuracy (deltas vs baseline `np=0.0`, in percentage points):**
+
+| Configuration                         | Clean   | σ=0.3  | σ=0.5  | σ=1.0  | avg σ  |
+|---------------------------------------|---------|--------|--------|--------|--------|
+| Baseline `np=0.5`                     | −1.23   | −0.59  | −0.54  | −0.56  | −0.56  |
+| Confident `np=0.0` (raw)              | **+0.95** | +0.02  | −0.06  | +0.20  | +0.05  |
+| Confident `np=0.5` (raw, collapsed)   | +0.58   | **+1.68** | **+1.19** | −1.63  | **+0.41** |
+| Confident-norm `np=0.0`               | +0.41   | −0.50  | −0.51  | +0.18  | −0.28  |
+| Confident-norm `np=0.5` (dynamic)     | **−3.16** | +0.36  | −0.23  | −0.32  | −0.06  |
+
+**Correlation (raw values, phi coefficient):**
+
+| Configuration                         | Clean  | σ=0.3 | σ=0.5 | σ=1.0 | avg σ |
+|---------------------------------------|--------|-------|-------|-------|-------|
+| Baseline `np=0.0`                     | 0.492  | 0.247 | 0.162 | 0.041 | 0.150 |
+| Baseline `np=0.5`                     | 0.481  | 0.264 | 0.175 | 0.075 | 0.171 |
+| Confident `np=0.0` (raw)              | 0.503  | 0.246 | 0.153 | 0.057 | 0.152 |
+| **Confident `np=0.5` (raw, collapsed)** | 0.492  | **0.392** | **0.312** | **0.158** | **0.287** |
+| Confident-norm `np=0.0`               | 0.499  | 0.220 | 0.115 | 0.026 | 0.121 |
+| Confident-norm `np=0.5` (dynamic)     | 0.461  | 0.295 | 0.174 | 0.079 | 0.169 |
+
+**E2-routing ratio under text noise (clean → σ=1.0):**
+
+| Configuration                         | Routing pattern                       |
+|---------------------------------------|---------------------------------------|
+| Baseline `np=0.0`                     | 0.451 → 0.533 (weakly toward E2)      |
+| Baseline `np=0.5`                     | 0.435 → 0.561 (toward E2)             |
+| Confident `np=0.0` (raw)              | **0.998 → 1.000 (collapsed to E2)**   |
+| Confident `np=0.5` (raw)              | **0.998 → 0.990 (collapsed to E2)**   |
+| Confident-norm `np=0.0`               | 0.470 → **0.000 (wrong direction)**   |
+| Confident-norm `np=0.5`               | 0.287 → **1.000 (textbook right)**    |
+
+**Three observations.**
+
+First, **without normalization the gate collapses.** The three confidence inputs (vision norm ≈ 8, audio norm ≈ 85, text norm ≈ 3) span an order of magnitude, and the new linear classifier learns to ignore the weak signals and default to "always E2." Inspection of the trained `gate_classifier` weights confirms the confidence weights are non-zero (similar magnitude to the content weights), but the bias and content terms together create an overwhelming E2 preference that the confidence signal cannot override.
+
+Second, **with normalization but without noise training, the gate learns the wrong direction.** Config `Confident-norm np=0.0` routes 47% to E2 on clean data and **0%** to E2 at σ=1.0 — exactly backwards. The cause is out-of-distribution extrapolation: clean training never sees the high text-norm regime that noise injection creates, so the linear weights are fit only over a narrow range and extrapolate arbitrarily on test-time noisy inputs. The falsifiable prediction (architecture alone, no training-time noise, recovers right-direction routing) is **falsified**.
+
+Third, **with normalization *and* noise training, the gate behaves exactly as predicted.** Config `Confident-norm np=0.5` routes 28.7% to E2 on clean data and 100% to E2 at σ=1.0 — a clean, monotonic shift toward the multimodal branch as text noise increases. The architectural mechanism works.
+
+But — the *winning* configuration on correlation is the "broken" `Confident np=0.5` (raw, collapsed), not the "correct" `Confident-norm np=0.5` (dynamic). Why? Because on MOSEI there is no rescue branch: routing to E1 under text noise is lateral at best, and the collapsed-to-E2 config gave E2 100% of the noisy training signal, training E2 itself to be more noise-robust. The correctly-routing config gave E2 only 28.7% of clean and varying fractions of noisy samples, leaving E2 less specialized. Dynamic routing is *worse* than degenerate always-E2 routing on this dataset.
+
+This is direct experimental confirmation of Finding 5's diagnosis: on MOSEI, the bottleneck is not the routing mechanism but the absence of a useful destination. The architectural fix works; the dataset doesn't reward it. The clean-accuracy hit (-3.16 pp) for the dynamic-routing config is the price of routing 70% to E1 on clean data, with no compensating gain under noise.
 
 ## Why the results are negative
 
