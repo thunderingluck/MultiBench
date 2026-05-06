@@ -53,6 +53,13 @@ def load_confident(np_train, normalize=False):
     return json.load(open(f)) if f else None
 
 
+def load_token_gate(np_train):
+    f = latest(f"dyn_token_enc_transformer_reg_{REG}_freezeFalse"
+               + (f"_np{np_train}_gaussian" if np_train > 0 else "")
+               + "_adapt_*.json")
+    return json.load(open(f)) if f else None
+
+
 def fmt_row(label, clean, sigma_results):
     cells = [f"{clean.get('Accuracy', clean.get('accuracy', 0)):.4f}" if clean else "—"]
     for s in ["0.3", "0.5", "1.0"]:
@@ -99,6 +106,8 @@ def main():
     cf_n05 = load_confident(0.5)
     cfn_n0 = load_confident(0.0, normalize=True)
     cfn_n05 = load_confident(0.5, normalize=True)
+    tk_n0 = load_token_gate(0.0)
+    tk_n05 = load_token_gate(0.5)
 
     print()
 
@@ -128,6 +137,14 @@ def main():
         clean = {"Accuracy": cfn_n05["mean"]["accuracy"]}
         sigma_results = cfn_n05["robustness"][0]["text"] if cfn_n05["robustness"] else {}
         print(fmt_row("[6] CONFIDENT-NORM (np=0.5, conf-norm)", clean, sigma_results))
+    if tk_n0:
+        clean = {"Accuracy": tk_n0["mean"]["accuracy"]}
+        sigma_results = tk_n0["robustness"][0]["text"] if tk_n0["robustness"] else {}
+        print(fmt_row("[7] TOKEN-GATE (np=0.0)", clean, sigma_results))
+    if tk_n05:
+        clean = {"Accuracy": tk_n05["mean"]["accuracy"]}
+        sigma_results = tk_n05["robustness"][0]["text"] if tk_n05["robustness"] else {}
+        print(fmt_row("[8] TOKEN-GATE (np=0.5)", clean, sigma_results))
 
     print()
     print("  CORRELATION (phi coefficient — same metric as old tables)")
@@ -153,6 +170,14 @@ def main():
         clean = {"Corr": cfn_n05["mean"]["corr"]}
         sigma_results = cfn_n05["robustness"][0]["text"] if cfn_n05["robustness"] else {}
         print(fmt_corr("[6] CONFIDENT-NORM (np=0.5, conf-norm)", clean, sigma_results))
+    if tk_n0:
+        clean = {"Corr": tk_n0["mean"]["corr"]}
+        sigma_results = tk_n0["robustness"][0]["text"] if tk_n0["robustness"] else {}
+        print(fmt_corr("[7] TOKEN-GATE (np=0.0)", clean, sigma_results))
+    if tk_n05:
+        clean = {"Corr": tk_n05["mean"]["corr"]}
+        sigma_results = tk_n05["robustness"][0]["text"] if tk_n05["robustness"] else {}
+        print(fmt_corr("[8] TOKEN-GATE (np=0.5)", clean, sigma_results))
 
     print()
     print("  E2 ROUTING RATIO (key test: does (3) route toward E2 under text noise?)")
@@ -174,6 +199,12 @@ def main():
     if cfn_n05:
         sigma_results = cfn_n05["robustness"][0]["text"] if cfn_n05["robustness"] else {}
         print(fmt_e2("[6] CONFIDENT-NORM (np=0.5, conf-norm)", cfn_n05["mean"]["ratio"], sigma_results))
+    if tk_n0:
+        sigma_results = tk_n0["robustness"][0]["text"] if tk_n0["robustness"] else {}
+        print(fmt_e2("[7] TOKEN-GATE (np=0.0)", tk_n0["mean"]["ratio"], sigma_results))
+    if tk_n05:
+        sigma_results = tk_n05["robustness"][0]["text"] if tk_n05["robustness"] else {}
+        print(fmt_e2("[8] TOKEN-GATE (np=0.5)", tk_n05["mean"]["ratio"], sigma_results))
 
 
 if __name__ == "__main__":
